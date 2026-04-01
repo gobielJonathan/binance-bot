@@ -6,16 +6,28 @@ import path from 'path';
 import config from '../config';
 import logger from '../utils/logger';
 import Database from '../services/database';
+import { TradeRepository, OpportunityRepository, MetricsRepository } from '../repositories';
 
 class DashboardServer {
   private app: express.Application;
   private server: ReturnType<typeof createServer>;
   private io: Server;
   private database: Database;
+  private tradeRepository: TradeRepository;
+  private opportunityRepository: OpportunityRepository;
+  private metricsRepository: MetricsRepository;
   private port: number;
 
-  constructor(database: Database) {
+  constructor(
+    database: Database,
+    tradeRepository: TradeRepository,
+    opportunityRepository: OpportunityRepository,
+    metricsRepository: MetricsRepository
+  ) {
     this.database = database;
+    this.tradeRepository = tradeRepository;
+    this.opportunityRepository = opportunityRepository;
+    this.metricsRepository = metricsRepository;
     this.port = config.dashboard.port;
     this.app = express();
     this.server = createServer(this.app);
@@ -94,6 +106,125 @@ class DashboardServer {
       } catch (error) {
         logger.error('Error getting profit summary', { error });
         res.status(500).json({ error: 'Failed to get profit summary' });
+      }
+    });
+
+    // Get open trades
+    this.app.get('/api/trades/open', async (req: Request, res: Response) => {
+      try {
+        const openTrades = await this.tradeRepository.getOpenTrades();
+        res.json(openTrades);
+      } catch (error) {
+        logger.error('Error getting open trades', { error });
+        res.status(500).json({ error: 'Failed to get open trades' });
+      }
+    });
+
+    // Get trade history with filters and pagination
+    this.app.get('/api/trades/history', async (req: Request, res: Response) => {
+      try {
+        const page = parseInt(req.query.page as string) || 1;
+        const limit = parseInt(req.query.limit as string) || 50;
+        const status = req.query.status as string;
+        const triangle = req.query.triangle as string;
+        const startDate = req.query.startDate as string;
+        const endDate = req.query.endDate as string;
+
+        const result = await this.tradeRepository.getTradeHistory({
+          page,
+          limit,
+          status,
+          triangle,
+          startDate,
+          endDate,
+        });
+        
+        // Transform result to match expected format
+        res.json({
+          trades: result.data,
+          total: result.total,
+          page: result.page,
+          limit: result.limit,
+          totalPages: result.totalPages,
+        });
+      } catch (error) {
+        logger.error('Error getting trade history', { error });
+        res.status(500).json({ error: 'Failed to get trade history' });
+      }
+    });
+
+    // Get trade statistics
+    this.app.get('/api/trades/stats', async (req: Request, res: Response) => {
+      try {
+        const stats = await this.tradeRepository.getTradeStats();
+        res.json(stats);
+      } catch (error) {
+        logger.error('Error getting trade stats', { error });
+        res.status(500).json({ error: 'Failed to get trade stats' });
+      }
+    });
+
+    // Get daily performance
+    this.app.get('/api/performance/daily', async (req: Request, res: Response) => {
+      try {
+        const days = parseInt(req.query.days as string) || 30;
+        const performance = await this.metricsRepository.getPerformanceByPeriod('daily', days);
+        res.json(performance);
+      } catch (error) {
+        logger.error('Error getting daily performance', { error });
+        res.status(500).json({ error: 'Failed to get daily performance' });
+      }
+    });
+
+    // Get weekly performance
+    this.app.get('/api/performance/weekly', async (req: Request, res: Response) => {
+      try {
+        const weeks = parseInt(req.query.weeks as string) || 12;
+        const performance = await this.metricsRepository.getPerformanceByPeriod('weekly', weeks);
+        res.json(performance);
+      } catch (error) {
+        logger.error('Error getting weekly performance', { error });
+        res.status(500).json({ error: 'Failed to get weekly performance' });
+      }
+    });
+
+    // Get monthly performance
+    this.app.get('/api/performance/monthly', async (req: Request, res: Response) => {
+      try {
+        const months = parseInt(req.query.months as string) || 12;
+        const performance = await this.metricsRepository.getPerformanceByPeriod('monthly', months);
+        res.json(performance);
+      } catch (error) {
+        logger.error('Error getting monthly performance', { error });
+        res.status(500).json({ error: 'Failed to get monthly performance' });
+      }
+    });
+
+    // Get account balance
+    this.app.get('/api/balance', async (req: Request, res: Response) => {
+      try {
+        // This will need to be wired up with the actual BalanceManager
+        // For now, return a placeholder
+        res.json({
+          totalUSDT: 0,
+          assets: [],
+          lastUpdate: new Date().toISOString(),
+        });
+      } catch (error) {
+        logger.error('Error getting balance', { error });
+        res.status(500).json({ error: 'Failed to get balance' });
+      }
+    });
+
+    // Get recent opportunities
+    this.app.get('/api/opportunities/recent', async (req: Request, res: Response) => {
+      try {
+        const limit = parseInt(req.query.limit as string) || 100;
+        const opportunities = await this.opportunityRepository.getRecentOpportunities(limit);
+        res.json(opportunities);
+      } catch (error) {
+        logger.error('Error getting opportunities', { error });
+        res.status(500).json({ error: 'Failed to get opportunities' });
       }
     });
 

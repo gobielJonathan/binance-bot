@@ -280,6 +280,13 @@ class Database {
       });
     });
   }
+
+  /**
+   * Get the underlying SQLite database instance for repository usage
+   */
+  getDatabase(): sqlite3.Database {
+    return this.db;
+  }
 }
 
 export default Database;

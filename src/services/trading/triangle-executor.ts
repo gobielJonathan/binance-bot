@@ -1,5 +1,6 @@
 import logger from '../../utils/logger';
 import Database, { Trade } from '../database';
+import { TradeRepository } from '../../repositories';
 import OrderExecutor from './order-executor';
 import BalanceManager from './balance-manager';
 import FeeCalculator from './fee-calculator';
@@ -21,18 +22,21 @@ class TriangleExecutor {
   private balanceManager: BalanceManager;
   private feeCalculator: FeeCalculator;
   private database: Database;
+  private tradeRepository: TradeRepository;
   private isExecuting: boolean = false;
 
   constructor(
     orderExecutor: OrderExecutor,
     balanceManager: BalanceManager,
     feeCalculator: FeeCalculator,
-    database: Database
+    database: Database,
+    tradeRepository: TradeRepository
   ) {
     this.orderExecutor = orderExecutor;
     this.balanceManager = balanceManager;
     this.feeCalculator = feeCalculator;
     this.database = database;
+    this.tradeRepository = tradeRepository;
 
     logger.info('Triangle executor initialized');
   }
@@ -84,8 +88,8 @@ class TriangleExecutor {
         created_at: new Date().toISOString(),
       };
 
-      const tradeId = await this.database.insertTrade(trade);
-      await this.database.updateTrade(tradeId, { status: 'in_progress' });
+      const tradeId = await this.tradeRepository.insertTrade(trade);
+      await this.tradeRepository.updateTrade(tradeId, { status: 'in_progress' });
 
       try {
         logger.info('Executing leg 1', {
@@ -99,7 +103,7 @@ class TriangleExecutor {
           quantity: startAmount / opportunity.leg1.price,
         });
 
-        await this.database.updateTrade(tradeId, {
+        await this.tradeRepository.updateTrade(tradeId, {
           leg1_filled: leg1Result.executedQty,
         });
 
@@ -115,7 +119,7 @@ class TriangleExecutor {
           quantity: leg2Quantity,
         });
 
-        await this.database.updateTrade(tradeId, {
+        await this.tradeRepository.updateTrade(tradeId, {
           leg2_amount: leg2Quantity,
           leg2_filled: leg2Result.executedQty,
         });
@@ -132,7 +136,7 @@ class TriangleExecutor {
           quantity: leg3Quantity,
         });
 
-        await this.database.updateTrade(tradeId, {
+        await this.tradeRepository.updateTrade(tradeId, {
           leg3_amount: leg3Quantity,
           leg3_filled: leg3Result.executedQty,
         });
@@ -145,7 +149,7 @@ class TriangleExecutor {
         const endAmount = leg3Result.executedQty * leg3Result.price;
         const profit = this.feeCalculator.calculateProfit(startAmount, endAmount, fees);
 
-        await this.database.updateTrade(tradeId, {
+        await this.tradeRepository.updateTrade(tradeId, {
           actual_profit_percent: profit.netProfitPercent,
           actual_profit_usdt: profit.netProfit,
           status: 'completed',
@@ -170,7 +174,7 @@ class TriangleExecutor {
       } catch (error) {
         logger.error('Triangle execution failed', { tradeId, error });
 
-        await this.database.updateTrade(tradeId, {
+        await this.tradeRepository.updateTrade(tradeId, {
           status: 'failed',
           error_message: error instanceof Error ? error.message : 'Unknown error',
           completed_at: new Date().toISOString(),

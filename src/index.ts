@@ -12,10 +12,14 @@ import BalanceManager from './services/trading/balance-manager';
 import FeeCalculator from './services/trading/fee-calculator';
 import TriangleExecutor from './services/trading/triangle-executor';
 import DashboardServer from './controllers/dashboard-server';
+import { TradeRepository, OpportunityRepository, MetricsRepository } from './repositories';
 
 class TradingBot {
   private binanceService: BinanceService;
   private database: Database;
+  private tradeRepository: TradeRepository;
+  private opportunityRepository: OpportunityRepository;
+  private metricsRepository: MetricsRepository;
   private wsClient: WebSocketClient;
   private priceAggregator: PriceAggregator;
   private triangleScanner: TriangleScanner;
@@ -37,6 +41,12 @@ class TradingBot {
 
     this.binanceService = new BinanceService();
     this.database = new Database();
+    
+    // Create repositories
+    this.tradeRepository = new TradeRepository(this.database.getDatabase());
+    this.opportunityRepository = new OpportunityRepository(this.database.getDatabase());
+    this.metricsRepository = new MetricsRepository(this.database.getDatabase());
+    
     this.wsClient = new WebSocketClient(this.binanceService.getClient());
     this.priceAggregator = new PriceAggregator();
     this.triangleScanner = new TriangleScanner();
@@ -53,10 +63,16 @@ class TradingBot {
       this.orderExecutor,
       this.balanceManager,
       this.feeCalculator,
-      this.database
+      this.database,
+      this.tradeRepository
     );
 
-    this.dashboardServer = new DashboardServer(this.database);
+    this.dashboardServer = new DashboardServer(
+      this.database,
+      this.tradeRepository,
+      this.opportunityRepository,
+      this.metricsRepository
+    );
 
     logger.info('Trading bot initialized successfully');
   }
