@@ -32,6 +32,11 @@ class TradingBot {
   private dashboardServer: DashboardServer;
   private isRunning: boolean = false;
 
+  // Risk tracking
+  private activeTrades: number = 0;
+  private consecutiveLosses: number = 0;
+  private initialBalanceUSDT: number = 0;
+
   constructor() {
     const mode = config.exchange.testnet ? 'TESTNET' : 'LIVE';
     logger.info(`Initializing trading bot... [${mode} MODE]`, {
@@ -98,6 +103,7 @@ class TradingBot {
       await this.balanceManager.updateBalances();
       const usdtBalance = await this.balanceManager.getUSDTBalance();
       const totalBalance = await this.balanceManager.getTotalBalanceUSDT();
+      this.initialBalanceUSDT = totalBalance; // snapshot for stop-loss tracking
       
       logger.info('Account balance', { 
         available: usdtBalance.toFixed(2),
@@ -153,6 +159,39 @@ class TradingBot {
 
   private async handleOpportunity(opportunity: any): Promise<void> {
     try {
+      // --- Risk: consecutive loss limit ---
+      if (this.consecutiveLosses >= config.risk.consecutiveLossLimit) {
+        logger.warn('🛑 Consecutive loss limit reached — bot paused', {
+          consecutiveLosses: this.consecutiveLosses,
+          limit: config.risk.consecutiveLossLimit,
+        });
+        return;
+      }
+
+      // --- Risk: stop-loss on total balance ---
+      if (this.initialBalanceUSDT > 0) {
+        const currentBalance = await this.balanceManager.getTotalBalanceUSDT();
+        const drawdownPercent = ((this.initialBalanceUSDT - currentBalance) / this.initialBalanceUSDT) * 100;
+        if (drawdownPercent >= config.risk.stopLossPercent) {
+          logger.warn('🛑 Stop-loss triggered — bot paused', {
+            initialBalance: this.initialBalanceUSDT.toFixed(2),
+            currentBalance: currentBalance.toFixed(2),
+            drawdownPercent: drawdownPercent.toFixed(2),
+            stopLossPercent: config.risk.stopLossPercent,
+          });
+          return;
+        }
+      }
+
+      // --- Risk: max concurrent trades ---
+      if (this.activeTrades >= config.risk.maxConcurrentTrades) {
+        logger.debug('Skipping opportunity - max concurrent trades reached', {
+          activeTrades: this.activeTrades,
+          max: config.risk.maxConcurrentTrades,
+        });
+        return;
+      }
+
       await this.database.insertOpportunity({
         triangle_name: opportunity.triangleName,
         spread_percent: opportunity.spreadPercent,
@@ -193,9 +232,12 @@ class TradingBot {
         netProfit: opportunity.netProfitPercent.toFixed(4),
       });
 
+      this.activeTrades++;
       const result = await this.triangleExecutor.executeTriangle(opportunity, triangle);
+      this.activeTrades = Math.max(0, this.activeTrades - 1);
 
       if (result.success) {
+        this.consecutiveLosses = 0; // reset on win
         logger.info('✅ Trade completed successfully', {
           profit: result.profit?.toFixed(4),
           profitPercent: result.profitPercent?.toFixed(4),
@@ -216,7 +258,12 @@ class TradingBot {
           timestamp: new Date().toISOString(),
         });
       } else {
-        logger.error('❌ Trade failed', { error: result.error });
+        this.consecutiveLosses++;
+        logger.error('❌ Trade failed', {
+          error: result.error,
+          consecutiveLosses: this.consecutiveLosses,
+          limit: config.risk.consecutiveLossLimit,
+        });
         
         // Broadcast failure to dashboard
         this.dashboardServer.broadcastTradeUpdate({
@@ -229,6 +276,7 @@ class TradingBot {
 
       await this.balanceManager.updateBalances();
     } catch (error) {
+      this.activeTrades = Math.max(0, this.activeTrades - 1);
       logger.error('Error handling opportunity', { error });
     }
   }

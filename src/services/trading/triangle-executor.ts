@@ -62,8 +62,8 @@ class TriangleExecutor {
       const maxPosition = (usdtBalance * config.strategy.maxPositionPercent) / 100;
       const startAmount = Math.min(opportunity.leg1.amount, maxPosition);
 
-      if (startAmount < 10) {
-        return { success: false, error: 'Insufficient balance' };
+      if (startAmount < 15) {
+        return { success: false, error: `Insufficient balance: startAmount $${startAmount.toFixed(2)} is below $15 minimum notional` };
       }
 
       const trade: Trade = {
