@@ -1,11 +1,19 @@
 import winston from 'winston';
 import config from '../config';
 
+// Serialize Error instances so their message/stack are visible in JSON logs
+const errorReplacer = (_key: string, value: unknown): unknown => {
+  if (value instanceof Error) {
+    return {  stack: value.stack, ...value,message: value.message, };
+  }
+  return value;
+};
+
 const logFormat = winston.format.combine(
   winston.format.timestamp({ format: 'YYYY-MM-DD HH:mm:ss' }),
   winston.format.errors({ stack: true }),
   winston.format.splat(),
-  winston.format.json()
+  winston.format.printf((info) => JSON.stringify(info, errorReplacer))
 );
 
 const consoleFormat = winston.format.combine(
@@ -16,7 +24,7 @@ const consoleFormat = winston.format.combine(
     if (Object.keys(meta).length > 0 && meta.stack) {
       msg += `\n${meta.stack}`;
     } else if (Object.keys(meta).length > 0) {
-      msg += ` ${JSON.stringify(meta)}`;
+      msg += ` ${JSON.stringify(meta, errorReplacer)}`;
     }
     return msg;
   })

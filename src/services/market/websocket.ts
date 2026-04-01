@@ -32,8 +32,8 @@ class WebSocketClient {
           symbol: ticker.symbol,
           bid: parseFloat(ticker.bestBid),
           ask: parseFloat(ticker.bestAsk),
-          bidQty: parseFloat(ticker.bestBidQty),
-          askQty: parseFloat(ticker.bestAskQty),
+          bidQty: parseFloat(ticker.bestBidQnt),  // binance-api-node uses "Qnt" not "Qty"
+          askQty: parseFloat(ticker.bestAskQnt),
           timestamp: Date.now(),
         };
 

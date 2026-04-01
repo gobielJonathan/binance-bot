@@ -71,7 +71,8 @@ class TradingBot {
       this.database,
       this.tradeRepository,
       this.opportunityRepository,
-      this.metricsRepository
+      this.metricsRepository,
+      this.balanceManager
     );
 
     logger.info('Trading bot initialized successfully');
@@ -118,6 +119,18 @@ class TradingBot {
 
       this.wsClient.subscribeToMultipleTickers(allPairs, (priceData) => {
         this.priceAggregator.updatePrice(priceData);
+      });
+
+      // Broadcast live bid/ask to dashboard clients — throttled per symbol to ~2/sec
+      const tickerLastSent = new Map<string, number>();
+      const TICKER_THROTTLE_MS = 500;
+      this.priceAggregator.onPriceUpdate((_symbol, priceData) => {
+        const now = Date.now();
+        const last = tickerLastSent.get(priceData.symbol) ?? 0;
+        if (now - last >= TICKER_THROTTLE_MS) {
+          tickerLastSent.set(priceData.symbol, now);
+          this.dashboardServer.broadcastTicker(priceData);
+        }
       });
 
       this.opportunityDetector.onOpportunity(async (opportunity) => {

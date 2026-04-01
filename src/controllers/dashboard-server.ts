@@ -7,6 +7,7 @@ import config from '../config';
 import logger from '../utils/logger';
 import Database from '../services/database';
 import { TradeRepository, OpportunityRepository, MetricsRepository } from '../repositories';
+import BalanceManager from '../services/trading/balance-manager';
 
 class DashboardServer {
   private app: express.Application;
@@ -16,18 +17,21 @@ class DashboardServer {
   private tradeRepository: TradeRepository;
   private opportunityRepository: OpportunityRepository;
   private metricsRepository: MetricsRepository;
+  private balanceManager: BalanceManager;
   private port: number;
 
   constructor(
     database: Database,
     tradeRepository: TradeRepository,
     opportunityRepository: OpportunityRepository,
-    metricsRepository: MetricsRepository
+    metricsRepository: MetricsRepository,
+    balanceManager: BalanceManager
   ) {
     this.database = database;
     this.tradeRepository = tradeRepository;
     this.opportunityRepository = opportunityRepository;
     this.metricsRepository = metricsRepository;
+    this.balanceManager = balanceManager;
     this.port = config.dashboard.port;
     this.app = express();
     this.server = createServer(this.app);
@@ -203,11 +207,11 @@ class DashboardServer {
     // Get account balance
     this.app.get('/api/balance', async (req: Request, res: Response) => {
       try {
-        // This will need to be wired up with the actual BalanceManager
-        // For now, return a placeholder
+        const allBalances = await this.balanceManager.getAllBalances();
+        const usdtBalance = allBalances.get('USDT');
         res.json({
-          totalUSDT: 0,
-          assets: [],
+          totalUSDT: usdtBalance?.total || 0,
+          freeUSDT: usdtBalance?.free || 0,
           lastUpdate: new Date().toISOString(),
         });
       } catch (error) {
@@ -229,7 +233,7 @@ class DashboardServer {
     });
 
     // Catch-all route - serve index.html for client-side routing
-    this.app.get('*', (req: Request, res: Response) => {
+    this.app.get('/*splat', (req: Request, res: Response) => {
       res.sendFile(path.join(__dirname, '../../ui/dist/index.html'));
     });
   }
@@ -238,10 +242,45 @@ class DashboardServer {
     this.io.on('connection', (socket) => {
       logger.info('Client connected to dashboard', { socketId: socket.id });
 
+      // Send current status immediately on connect
+      socket.emit('bot:status', {
+        mode: config.exchange.testnet ? 'testnet' : 'live',
+        isRunning: true,
+        minSpread: config.strategy.minSpreadPercent,
+        maxPosition: config.strategy.maxPositionPercent,
+        timestamp: new Date().toISOString(),
+      });
+
       socket.on('disconnect', () => {
         logger.info('Client disconnected from dashboard', { socketId: socket.id });
       });
     });
+  }
+
+  // Public broadcast methods — called by the bot's trading/scanning services
+
+  broadcastTradeNew(trade: object): void {
+    this.io.emit('trade:new', trade);
+  }
+
+  broadcastTradeUpdate(trade: object): void {
+    this.io.emit('trade:update', trade);
+  }
+
+  broadcastOpportunity(opportunity: object): void {
+    this.io.emit('opportunity:detected', opportunity);
+  }
+
+  broadcastStatus(status: object): void {
+    this.io.emit('bot:status', status);
+  }
+
+  broadcastProfitSummary(summary: object): void {
+    this.io.emit('profit:update', summary);
+  }
+
+  broadcastTicker(priceData: object): void {
+    this.io.emit('ticker:update', priceData);
   }
 
   private async getAggregatedMetrics(period: string) {
@@ -387,23 +426,12 @@ class DashboardServer {
     };
   }
 
-  // Broadcast trade update to all connected clients
-  public broadcastTradeUpdate(trade: any): void {
-    this.io.emit('trade:update', trade);
-  }
-
-  // Broadcast opportunity to all connected clients
-  public broadcastOpportunity(opportunity: any): void {
-    this.io.emit('opportunity:new', opportunity);
-  }
-
   public start(): void {
     this.server.listen(this.port, () => {
       logger.info(`Dashboard server started`, {
         port: this.port,
         url: `http://localhost:${this.port}`,
       });
-      console.log(`\n📊 Dashboard: http://localhost:${this.port}\n`);
     });
   }
 

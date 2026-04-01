@@ -36,9 +36,10 @@ class BinanceService {
       apiKey: config.exchange.apiKey,
       apiSecret: config.exchange.apiSecret,
       httpBase: this.isTestnet ? 'https://testnet.binance.vision' : 'https://api.binance.com',
+
       wsBase: this.isTestnet
-        ? 'wss://ws-api.testnet.binance.vision/ws-api/v3'
-        : 'wss://ws-api.binance.com:443/ws-api/v3',
+        ? 'wss://stream.testnet.binance.vision/ws'
+        : 'wss://stream.binance.com:9443/ws',
     });
 
     logger.info('Binance service initialized', {
