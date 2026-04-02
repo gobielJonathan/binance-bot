@@ -30,7 +30,8 @@ export const useTradingStore = defineStore('trading', () => {
   // Loading states
   const loading = ref({
     status: false,
-    trades: false,
+    openTrades: false,
+    tradeHistory: false,
     stats: false,
     performance: false,
     opportunities: false,
@@ -40,7 +41,8 @@ export const useTradingStore = defineStore('trading', () => {
   // Error states
   const errors = ref({
     status: null as string | null,
-    trades: null as string | null,
+    openTrades: null as string | null,
+    tradeHistory: null as string | null,
     stats: null as string | null,
     performance: null as string | null,
     opportunities: null as string | null,
@@ -78,15 +80,15 @@ export const useTradingStore = defineStore('trading', () => {
   }
 
   async function fetchOpenTrades() {
-    loading.value.trades = true
-    errors.value.trades = null
+    loading.value.openTrades = true
+    errors.value.openTrades = null
     try {
       openTrades.value = await tradingApi.getOpenTrades()
     } catch (error) {
-      errors.value.trades = error instanceof Error ? error.message : 'Failed to fetch trades'
+      errors.value.openTrades = error instanceof Error ? error.message : 'Failed to fetch trades'
       console.error('Error fetching open trades:', error)
     } finally {
-      loading.value.trades = false
+      loading.value.openTrades = false
     }
   }
 
@@ -98,18 +100,18 @@ export const useTradingStore = defineStore('trading', () => {
     startDate?: string
     endDate?: string
   } = {}) {
-    loading.value.trades = true
-    errors.value.trades = null
+    loading.value.tradeHistory = true
+    errors.value.tradeHistory = null
     try {
       const response = await tradingApi.getTradeHistory(params)
       tradeHistory.value = response.trades
       return response
     } catch (error) {
-      errors.value.trades = error instanceof Error ? error.message : 'Failed to fetch trade history'
+      errors.value.tradeHistory = error instanceof Error ? error.message : 'Failed to fetch trade history'
       console.error('Error fetching trade history:', error)
       return null
     } finally {
-      loading.value.trades = false
+      loading.value.tradeHistory = false
     }
   }
 

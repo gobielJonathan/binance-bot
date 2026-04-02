@@ -19,30 +19,30 @@
         </select>
         <button
           @click="loadTrades"
-          :disabled="loading"
+          :disabled="tradingStore.loading.tradeHistory"
           class="flex items-center gap-1.5 bg-slate-800 hover:bg-slate-700 border border-slate-700 hover:border-slate-600 text-slate-300 hover:text-white text-xs font-medium px-3 py-2 rounded-xl transition-all duration-200 disabled:opacity-40"
         >
-          <ArrowPathIcon :class="['w-3.5 h-3.5', loading && 'animate-spin']" />
-          {{ loading ? 'Loading...' : 'Refresh' }}
+          <ArrowPathIcon :class="['w-3.5 h-3.5', tradingStore.loading.tradeHistory && 'animate-spin']" />
+          {{ tradingStore.loading.tradeHistory ? 'Loading...' : 'Refresh' }}
         </button>
       </div>
     </div>
 
     <!-- Content -->
-    <div v-if="loading && trades.length === 0" class="flex items-center justify-center py-16">
+    <div v-if="tradingStore.loading.tradeHistory && trades.length === 0" class="flex items-center justify-center py-16">
       <div class="flex flex-col items-center gap-3">
         <div class="w-7 h-7 border-2 border-slate-700 border-t-cyan-500 rounded-full animate-spin"></div>
         <p class="text-xs text-slate-500">Loading trades...</p>
       </div>
     </div>
 
-    <div v-else-if="error" class="py-12 text-center px-6">
+    <div v-else-if="tradingStore.errors.tradeHistory" class="py-12 text-center px-6">
       <ExclamationTriangleIcon class="w-8 h-8 text-red-400 mx-auto mb-3" />
       <p class="text-sm text-red-400 font-medium">Failed to load trades</p>
-      <p class="text-xs text-slate-600 mt-1">{{ error }}</p>
+      <p class="text-xs text-slate-600 mt-1">{{ tradingStore.errors.tradeHistory }}</p>
     </div>
 
-    <div v-else-if="trades.length === 0" class="py-16 text-center">
+    <div v-else-if="tradingStore.loading.tradeHistory && trades.length === 0" class="py-16 text-center">
       <ChartBarIcon class="w-10 h-10 text-slate-800 mx-auto mb-3" />
       <p class="text-sm text-slate-500 font-medium">No trades found</p>
       <p class="text-xs text-slate-600 mt-1">Executed trades will appear here</p>
@@ -63,7 +63,7 @@
           </thead>
           <tbody>
             <tr
-              v-for="trade in trades"
+              v-for="trade in tradingStore.tradeHistory"
               :key="trade.id"
               class="border-b border-slate-800/50 hover:bg-slate-800/20 transition-colors duration-150 group"
             >
@@ -76,7 +76,7 @@
               <td class="px-4 py-4"><TradeStatusBadge :status="trade.status" /></td>
               <td class="px-4 py-4 text-right">
                 <span :class="['text-sm font-semibold', trade.expected_profit_percent >= 0 ? 'text-emerald-400' : 'text-red-400']">
-                  +{{ trade.expected_profit_percent.toFixed(4) }}%
+                  +{{ trade.expected_profit_percent?.toFixed(4) }}%
                 </span>
               </td>
               <td class="px-4 py-4 text-right">
@@ -85,7 +85,7 @@
                     {{ formatCurrency(trade.actual_profit_usdt) }}
                   </div>
                   <div v-if="trade.actual_profit_percent !== undefined" class="text-[10px] text-slate-600">
-                    {{ trade.actual_profit_percent.toFixed(4) }}%
+                    {{ trade.actual_profit_percent?.toFixed(4) }}%
                   </div>
                 </div>
                 <span v-else class="text-slate-600 text-sm">—</span>
@@ -136,30 +136,18 @@ import { format } from 'date-fns'
 import { ArrowPathIcon, ExclamationTriangleIcon, ChartBarIcon } from '@heroicons/vue/24/outline'
 import { useTradingStore } from '../stores/trading'
 import TradeStatusBadge from './TradeStatusBadge.vue'
-import type { Trade, PaginatedTradeResponse } from '../types/api'
+import type { PaginatedTradeResponse } from '../types/api'
 
 const tradingStore = useTradingStore()
-const trades = ref<Trade[]>([])
-const loading = ref(false)
-const error = ref<string | null>(null)
 const pagination = ref<PaginatedTradeResponse | null>(null)
-
 const filters = reactive({ status: '', page: 1, limit: 15 })
 
 async function loadTrades() {
-  loading.value = true
-  error.value = null
-  try {
-    const res = await tradingStore.fetchTradeHistory({
-      page: filters.page, limit: filters.limit,
-      status: filters.status || undefined,
-    })
-    if (res) { trades.value = res.trades; pagination.value = res }
-  } catch (e) {
-    error.value = e instanceof Error ? e.message : 'Failed to load trades'
-  } finally {
-    loading.value = false
-  }
+  await tradingStore.fetchTradeHistory({
+    page: filters.page,
+    limit: filters.limit,
+    status: filters.status || undefined,
+  })
 }
 
 function prevPage() {
