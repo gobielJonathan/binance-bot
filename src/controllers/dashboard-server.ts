@@ -231,11 +231,6 @@ class DashboardServer {
         res.status(500).json({ error: 'Failed to get opportunities' });
       }
     });
-
-    // Catch-all route - serve index.html for client-side routing
-    this.app.get('/*splat', (req: Request, res: Response) => {
-      res.sendFile(path.join(__dirname, '../../ui/dist/index.html'));
-    });
   }
 
   private setupWebSocket(): void {
