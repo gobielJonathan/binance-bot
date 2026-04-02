@@ -159,8 +159,8 @@ class BinanceService {
       (f: any) => f.filterType === 'NOTIONAL' || f.filterType === 'MIN_NOTIONAL'
     );
     if (!notionalFilter) {
-      // Default fallback if filter not found
-      return { minNotional: 0, applyToMarket: true, avgPriceMins: 5 };
+      logger.warn('NOTIONAL filter not found for symbol — skipping notional check', { symbol });
+      return { minNotional: 0, applyToMarket: false, avgPriceMins: 5 };
     }
 
     const filter: NotionalFilter = {

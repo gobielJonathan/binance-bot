@@ -258,7 +258,10 @@ class TradingBot {
           timestamp: new Date().toISOString(),
         });
       } else {
-        this.consecutiveLosses++;
+        // Only count real execution failures — pre-validation rejections have no tradeId
+        if (result.tradeId != null) {
+          this.consecutiveLosses++;
+        }
         logger.error('❌ Trade failed', {
           error: result.error,
           consecutiveLosses: this.consecutiveLosses,
