@@ -11,7 +11,7 @@ import OrderExecutor from './services/trading/order-executor';
 import BalanceManager from './services/trading/balance-manager';
 import FeeCalculator from './services/trading/fee-calculator';
 import TriangleExecutor from './services/trading/triangle-executor';
-import DashboardServer from './controllers/dashboard-server';
+import DashboardServer from './controllers/dashboard';
 import { TradeRepository, OpportunityRepository, MetricsRepository } from './repositories';
 
 class TradingBot {
