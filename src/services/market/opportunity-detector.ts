@@ -66,6 +66,10 @@ class OpportunityDetector {
       return null;
     }
 
+    if (prices.some((p) => !p!.ask || !p!.bid || p!.ask <= 0 || p!.bid <= 0 || !isFinite(p!.ask) || !isFinite(p!.bid))) {
+      return null;
+    }
+
     let currentAmount = startAmountUSDT;
     const legs: ArbitrageOpportunity['leg1'][] = [];
 
@@ -102,7 +106,7 @@ class OpportunityDetector {
     const netProfitPercent = spreadPercent;
     const estimatedProfitUSDT = finalAmount - startAmountUSDT;
 
-    if (netProfitPercent < 0) {
+    if (!isFinite(spreadPercent) || !isFinite(netProfitPercent) || netProfitPercent < 0) {
       return null;
     }
 
