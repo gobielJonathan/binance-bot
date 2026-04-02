@@ -62,9 +62,57 @@ class TriangleExecutor {
       const maxPosition = (usdtBalance * config.strategy.maxPositionPercent) / 100;
       const startAmount = Math.min(opportunity.leg1.amount, maxPosition);
 
-      if (startAmount < 15) {
-        return { success: false, error: `Insufficient balance: startAmount $${startAmount.toFixed(2)} is below $15 minimum notional` };
-      }
+      // Pre-validate all legs for NOTIONAL requirements
+       try {
+         // Leg 1 validation
+         const leg1Validation = await this.orderExecutor.validateOrder(
+           opportunity.leg1.pair,
+           opportunity.leg1.side,
+           startAmount / opportunity.leg1.price
+         );
+         
+         // Amount of asset we have after Leg 1
+         const amountAfterLeg1 = opportunity.leg1.side === 'BUY'
+           ? leg1Validation.adjustedQuantity
+           : leg1Validation.adjustedQuantity * leg1Validation.price;
+
+         // Leg 2 validation
+         const leg2Quantity = opportunity.leg2.side === 'BUY'
+           ? amountAfterLeg1 / opportunity.leg2.price
+           : amountAfterLeg1;
+
+         const leg2Validation = await this.orderExecutor.validateOrder(
+           opportunity.leg2.pair,
+           opportunity.leg2.side,
+           leg2Quantity
+         );
+
+         // Amount of asset we have after Leg 2
+         const amountAfterLeg2 = opportunity.leg2.side === 'BUY'
+           ? leg2Validation.adjustedQuantity
+           : leg2Validation.adjustedQuantity * leg2Validation.price;
+
+         // Leg 3 validation
+         const leg3Quantity = opportunity.leg3.side === 'BUY'
+           ? amountAfterLeg2 / opportunity.leg3.price
+           : amountAfterLeg2;
+
+         const leg3Validation = await this.orderExecutor.validateOrder(
+           opportunity.leg3.pair,
+           opportunity.leg3.side,
+           leg3Quantity
+         );
+
+         logger.info('Pre-execution validation successful', {
+           leg1Notional: leg1Validation.notionalValue,
+           leg2Notional: leg2Validation.notionalValue,
+           leg3Notional: leg3Validation.notionalValue,
+         });
+       } catch (validationError) {
+         const errorMsg = validationError instanceof Error ? validationError.message : 'Validation failed';
+         logger.warn('Triangle pre-execution validation failed', { error: errorMsg });
+         return { success: false, error: `Validation failed: ${errorMsg}` };
+       }
 
       const trade: Trade = {
         triangle_name: opportunity.triangleName,
@@ -107,7 +155,16 @@ class TriangleExecutor {
           leg1_filled: leg1Result.executedQty,
         });
 
-        const leg2Quantity = leg1Result.executedQty;
+        // Amount of asset we have after Leg 1
+        const amountAfterLeg1 = leg1Result.side === 'BUY' 
+          ? leg1Result.executedQty // we have base asset
+          : leg1Result.executedQty * leg1Result.price; // we have quote asset
+
+        // Calculate quantity for leg 2
+        const leg2Quantity = opportunity.leg2.side === 'BUY'
+          ? amountAfterLeg1 / opportunity.leg2.price
+          : amountAfterLeg1;
+
         logger.info('Executing leg 2', {
           pair: opportunity.leg2.pair,
           side: opportunity.leg2.side,
@@ -124,7 +181,15 @@ class TriangleExecutor {
           leg2_filled: leg2Result.executedQty,
         });
 
-        const leg3Quantity = leg2Result.executedQty;
+        // Calculate quantity for leg 3 based on leg 2 result
+        const amountAfterLeg2 = leg2Result.side === 'BUY'
+          ? leg2Result.executedQty
+          : leg2Result.executedQty * leg2Result.price;
+          
+        const leg3Quantity = opportunity.leg3.side === 'BUY'
+          ? amountAfterLeg2 / opportunity.leg3.price
+          : amountAfterLeg2;
+
         logger.info('Executing leg 3', {
           pair: opportunity.leg3.pair,
           side: opportunity.leg3.side,

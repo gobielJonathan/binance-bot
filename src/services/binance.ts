@@ -15,6 +15,12 @@ export interface LotSizeFilter {
   stepDecimals: number;
 }
 
+export interface NotionalFilter {
+  minNotional: number;
+  applyToMarket: boolean;
+  avgPriceMins: number;
+}
+
 export interface OrderResult {
   symbol: string;
   orderId: number;
@@ -32,6 +38,7 @@ class BinanceService {
   private client: BinanceClient;
   private isTestnet: boolean;
   private lotSizeCache: Map<string, LotSizeFilter> = new Map();
+  private notionalCache: Map<string, NotionalFilter> = new Map();
 
   constructor() {
     this.isTestnet = config.exchange.testnet;
@@ -135,6 +142,33 @@ class BinanceService {
     };
 
     this.lotSizeCache.set(symbol, filter);
+    return filter;
+  }
+
+  async getNotionalFilter(symbol: string): Promise<NotionalFilter> {
+    const cached = this.notionalCache.get(symbol);
+    if (cached) return cached;
+
+    const info = await this.getExchangeInfo();
+    const symbolInfo = (info.symbols as any[]).find((s: any) => s.symbol === symbol);
+    if (!symbolInfo) throw new Error(`Symbol ${symbol} not found in exchange info`);
+
+    // In some symbols, it's NOTIONAL, in others it's MIN_NOTIONAL
+    const notionalFilter = symbolInfo.filters.find(
+      (f: any) => f.filterType === 'NOTIONAL' || f.filterType === 'MIN_NOTIONAL'
+    );
+    if (!notionalFilter) {
+      // Default fallback if filter not found
+      return { minNotional: 0, applyToMarket: true, avgPriceMins: 5 };
+    }
+
+    const filter: NotionalFilter = {
+      minNotional: parseFloat(notionalFilter.minNotional || notionalFilter.notional || '0'),
+      applyToMarket: notionalFilter.applyToMarket !== false,
+      avgPriceMins: parseInt(notionalFilter.avgPriceMins || '5', 10),
+    };
+
+    this.notionalCache.set(symbol, filter);
     return filter;
   }
 
