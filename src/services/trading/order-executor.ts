@@ -30,9 +30,21 @@ class OrderExecutor {
   }
 
   async executeOrder(request: OrderRequest): Promise<OrderExecution> {
-    const { symbol, side, quantity } = request;
+    const { symbol, side } = request;
+    let { quantity } = request;
 
     try {
+      // Snap quantity to exchange LOT_SIZE requirements
+      const lotSize = await this.binanceService.getLotSizeFilter(symbol);
+      quantity = Math.floor(quantity / lotSize.stepSize) * lotSize.stepSize;
+      quantity = parseFloat(quantity.toFixed(lotSize.stepDecimals));
+
+      if (quantity < lotSize.minQty) {
+        throw new Error(
+          `Quantity ${quantity} is below minQty ${lotSize.minQty} for ${symbol}`
+        );
+      }
+
       logger.info('Executing order', { symbol, side, quantity });
 
       const startTime = Date.now();

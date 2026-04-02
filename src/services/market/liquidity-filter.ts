@@ -36,12 +36,12 @@ class LiquidityFilter {
       const volume24h = parseFloat((stats as any).volume || '0');
       const volumeUSDT = parseFloat((stats as any).quoteVolume || '0');
 
-      const bidDepth = orderBook.bids
+      const bidDepth = (orderBook.bids as any[])
         .slice(0, 10)
-        .reduce((sum: number, [, qty]: [string, string]) => sum + parseFloat(qty), 0);
-      const askDepth = orderBook.asks
+        .reduce((sum: number, entry: any) => sum + parseFloat(entry.quantity ?? entry[1]), 0);
+      const askDepth = (orderBook.asks as any[])
         .slice(0, 10)
-        .reduce((sum: number, [, qty]: [string, string]) => sum + parseFloat(qty), 0);
+        .reduce((sum: number, entry: any) => sum + parseFloat(entry.quantity ?? entry[1]), 0);
 
       const meetsRequirements = volumeUSDT >= config.strategy.minLiquidity24h;
 

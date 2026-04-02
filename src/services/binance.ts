@@ -8,6 +8,13 @@ export interface Balance {
   locked: string;
 }
 
+export interface LotSizeFilter {
+  minQty: number;
+  maxQty: number;
+  stepSize: number;
+  stepDecimals: number;
+}
+
 export interface OrderResult {
   symbol: string;
   orderId: number;
@@ -24,6 +31,7 @@ type BinanceClient = ReturnType<typeof Binance>;
 class BinanceService {
   private client: BinanceClient;
   private isTestnet: boolean;
+  private lotSizeCache: Map<string, LotSizeFilter> = new Map();
 
   constructor() {
     this.isTestnet = config.exchange.testnet;
@@ -103,6 +111,31 @@ class BinanceService {
       logger.error('Failed to get exchange info', { error });
       throw error;
     }
+  }
+
+  async getLotSizeFilter(symbol: string): Promise<LotSizeFilter> {
+    const cached = this.lotSizeCache.get(symbol);
+    if (cached) return cached;
+
+    const info = await this.getExchangeInfo();
+    const symbolInfo = (info.symbols as any[]).find((s: any) => s.symbol === symbol);
+    if (!symbolInfo) throw new Error(`Symbol ${symbol} not found in exchange info`);
+
+    const lotFilter = symbolInfo.filters.find((f: any) => f.filterType === 'LOT_SIZE');
+    if (!lotFilter) throw new Error(`LOT_SIZE filter not found for ${symbol}`);
+
+    const stepSize = parseFloat(lotFilter.stepSize);
+    const stepDecimals = (lotFilter.stepSize as string).replace(/0+$/, '').split('.')[1]?.length ?? 0;
+
+    const filter: LotSizeFilter = {
+      minQty: parseFloat(lotFilter.minQty),
+      maxQty: parseFloat(lotFilter.maxQty),
+      stepSize,
+      stepDecimals,
+    };
+
+    this.lotSizeCache.set(symbol, filter);
+    return filter;
   }
 
   async get24hrStats(symbol: string) {
