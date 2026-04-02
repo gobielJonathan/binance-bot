@@ -15,6 +15,9 @@ export interface TriangleExecutionResult {
   profitPercent?: number;
   error?: string;
   partialFill?: boolean;
+  recoveryAttempted?: boolean;
+  recoverySuccess?: boolean;
+  recoveryAmountUSDT?: number;
 }
 
 class TriangleExecutor {
@@ -139,21 +142,40 @@ class TriangleExecutor {
       const tradeId = await this.tradeRepository.insertTrade(trade);
       await this.tradeRepository.updateTrade(tradeId, { status: 'in_progress' });
 
+      // --- LEG 1 ---
+      let leg1Result: Awaited<ReturnType<OrderExecutor['executeOrder']>>;
       try {
         logger.info('Executing leg 1', {
           pair: opportunity.leg1.pair,
           side: opportunity.leg1.side,
           amount: startAmount,
         });
-        const leg1Result = await this.orderExecutor.executeOrder({
+        leg1Result = await this.orderExecutor.executeOrder({
           symbol: opportunity.leg1.pair,
           side: opportunity.leg1.side,
           quantity: startAmount / opportunity.leg1.price,
         });
-
         await this.tradeRepository.updateTrade(tradeId, {
           leg1_filled: leg1Result.executedQty,
         });
+      } catch (error) {
+        // Leg 1 failed — nothing was acquired, no recovery needed
+        logger.error('Leg 1 failed — no funds at risk', { tradeId, error });
+        await this.tradeRepository.updateTrade(tradeId, {
+          status: 'failed',
+          error_message: error instanceof Error ? error.message : 'Unknown error',
+          completed_at: new Date().toISOString(),
+        });
+        return {
+          success: false,
+          tradeId,
+          error: error instanceof Error ? error.message : 'Unknown error',
+        };
+      }
+
+      // --- LEG 2 ---
+      let leg2Result: Awaited<ReturnType<OrderExecutor['executeOrder']>>;
+      try {
 
         // Amount of asset we have after Leg 1
         const amountAfterLeg1 = leg1Result.side === 'BUY' 
@@ -170,23 +192,56 @@ class TriangleExecutor {
           side: opportunity.leg2.side,
           quantity: leg2Quantity,
         });
-        const leg2Result = await this.orderExecutor.executeOrder({
+        leg2Result = await this.orderExecutor.executeOrder({
           symbol: opportunity.leg2.pair,
           side: opportunity.leg2.side,
           quantity: leg2Quantity,
         });
-
         await this.tradeRepository.updateTrade(tradeId, {
           leg2_amount: leg2Quantity,
           leg2_filled: leg2Result.executedQty,
         });
+      } catch (error) {
+        // Leg 2 failed — we hold the intermediate token from leg 1; reverse leg 1 to recover
+        logger.error('Leg 2 failed — attempting recovery by reversing leg 1', { tradeId, error });
+        await this.tradeRepository.updateTrade(tradeId, { status: 'recovering' });
+        const recoverySide = opportunity.leg1.side === 'BUY' ? 'SELL' : 'BUY';
+        const recovery = await this.recoverFunds(
+          tradeId,
+          opportunity.leg1.pair,
+          recoverySide,
+          leg1Result.executedQty,
+          'leg2-failure'
+        );
+        const loss = recovery.recoveredUSDT != null ? startAmount - recovery.recoveredUSDT : startAmount;
+        await this.tradeRepository.updateTrade(tradeId, {
+          status: recovery.success ? 'recovered' : 'stranded',
+          error_message: error instanceof Error ? error.message : 'Unknown error',
+          actual_profit_usdt: -loss,
+          actual_profit_percent: -(loss / startAmount) * 100,
+          completed_at: new Date().toISOString(),
+        });
+        return {
+          success: false,
+          tradeId,
+          error: error instanceof Error ? error.message : 'Unknown error',
+          recoveryAttempted: true,
+          recoverySuccess: recovery.success,
+          recoveryAmountUSDT: recovery.recoveredUSDT,
+        };
+      }
+
+      // --- LEG 3 ---
+      let leg3Result: Awaited<ReturnType<OrderExecutor['executeOrder']>>;
+      let leg3Quantity = 0;
+      try {
 
         // Calculate quantity for leg 3 based on leg 2 result
         const amountAfterLeg2 = leg2Result.side === 'BUY'
           ? leg2Result.executedQty
           : leg2Result.executedQty * leg2Result.price;
           
-        const leg3Quantity = opportunity.leg3.side === 'BUY'
+        leg3Quantity = opportunity.leg3.side === 'BUY'
           ? amountAfterLeg2 / opportunity.leg3.price
           : amountAfterLeg2;
 
@@ -195,65 +250,109 @@ class TriangleExecutor {
           side: opportunity.leg3.side,
           quantity: leg3Quantity,
         });
-        const leg3Result = await this.orderExecutor.executeOrder({
+        leg3Result = await this.orderExecutor.executeOrder({
           symbol: opportunity.leg3.pair,
           side: opportunity.leg3.side,
           quantity: leg3Quantity,
         });
-
         await this.tradeRepository.updateTrade(tradeId, {
           leg3_amount: leg3Quantity,
           leg3_filled: leg3Result.executedQty,
         });
-
-        const fees = this.feeCalculator.calculateTriangleFees(
-          leg1Result,
-          leg2Result,
-          leg3Result
-        );
-        const endAmount = leg3Result.executedQty * leg3Result.price;
-        const profit = this.feeCalculator.calculateProfit(startAmount, endAmount, fees);
-
-        await this.tradeRepository.updateTrade(tradeId, {
-          actual_profit_percent: profit.netProfitPercent,
-          actual_profit_usdt: profit.netProfit,
-          status: 'completed',
-          completed_at: new Date().toISOString(),
-        });
-
-        logger.info('Triangle execution completed successfully', {
-          tradeId,
-          netProfit: profit.netProfit.toFixed(4),
-          netProfitPercent: profit.netProfitPercent.toFixed(4),
-        });
-
-        this.feeCalculator.logFeeBreakdown(fees);
-        this.feeCalculator.logProfitBreakdown(profit);
-
-        return {
-          success: true,
-          tradeId,
-          profit: profit.netProfit,
-          profitPercent: profit.netProfitPercent,
-        };
       } catch (error) {
-        logger.error('Triangle execution failed', { tradeId, error });
-
+        // Leg 3 failed — we hold the second intermediate token; leg 3 already returns to USDT, so retry it as recovery
+        logger.error('Leg 3 failed — attempting recovery by re-executing leg 3', { tradeId, error });
+        await this.tradeRepository.updateTrade(tradeId, { status: 'recovering' });
+        const recovery = await this.recoverFunds(
+          tradeId,
+          opportunity.leg3.pair,
+          opportunity.leg3.side,
+          leg3Quantity,
+          'leg3-failure'
+        );
+        const loss = recovery.recoveredUSDT != null ? startAmount - recovery.recoveredUSDT : startAmount;
         await this.tradeRepository.updateTrade(tradeId, {
-          status: 'failed',
+          status: recovery.success ? 'recovered' : 'stranded',
           error_message: error instanceof Error ? error.message : 'Unknown error',
+          actual_profit_usdt: -loss,
+          actual_profit_percent: -(loss / startAmount) * 100,
           completed_at: new Date().toISOString(),
         });
-
         return {
           success: false,
           tradeId,
           error: error instanceof Error ? error.message : 'Unknown error',
-          partialFill: true,
+          recoveryAttempted: true,
+          recoverySuccess: recovery.success,
+          recoveryAmountUSDT: recovery.recoveredUSDT,
         };
       }
+
+      // --- ALL LEGS COMPLETE ---
+      const fees = this.feeCalculator.calculateTriangleFees(
+        leg1Result,
+        leg2Result,
+        leg3Result
+      );
+      const endAmount = leg3Result.executedQty * leg3Result.price;
+      const profit = this.feeCalculator.calculateProfit(startAmount, endAmount, fees);
+
+      await this.tradeRepository.updateTrade(tradeId, {
+        actual_profit_percent: profit.netProfitPercent,
+        actual_profit_usdt: profit.netProfit,
+        status: 'completed',
+        completed_at: new Date().toISOString(),
+      });
+
+      logger.info('Triangle execution completed successfully', {
+        tradeId,
+        netProfit: profit.netProfit.toFixed(4),
+        netProfitPercent: profit.netProfitPercent.toFixed(4),
+      });
+
+      this.feeCalculator.logFeeBreakdown(fees);
+      this.feeCalculator.logProfitBreakdown(profit);
+
+      return {
+        success: true,
+        tradeId,
+        profit: profit.netProfit,
+        profitPercent: profit.netProfitPercent,
+      };
     } finally {
       this.isExecuting = false;
+    }
+  }
+
+  private async recoverFunds(
+    tradeId: number,
+    symbol: string,
+    side: 'BUY' | 'SELL',
+    quantity: number,
+    context: string
+  ): Promise<{ success: boolean; recoveredUSDT?: number }> {
+    try {
+      logger.warn('Attempting recovery order', { tradeId, symbol, side, quantity, context });
+      const result = await this.orderExecutor.executeOrder({ symbol, side, quantity });
+      const recoveredUSDT = result.executedQty * result.price;
+      logger.info('Recovery order succeeded', {
+        tradeId,
+        symbol,
+        side,
+        recoveredUSDT: recoveredUSDT.toFixed(4),
+        context,
+      });
+      return { success: true, recoveredUSDT };
+    } catch (recoveryError) {
+      logger.error('Recovery order failed — funds may be stranded', {
+        tradeId,
+        symbol,
+        side,
+        quantity,
+        context,
+        error: recoveryError,
+      });
+      return { success: false };
     }
   }
 

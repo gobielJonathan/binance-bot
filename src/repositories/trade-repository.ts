@@ -39,7 +39,7 @@ export class TradeRepository extends BaseRepository {
   async getOpenTrades(): Promise<Trade[]> {
     const sql = `
       SELECT * FROM trades 
-      WHERE status IN ('pending', 'in_progress') 
+      WHERE status IN ('pending', 'in_progress', 'recovering') 
       ORDER BY created_at DESC
     `;
     

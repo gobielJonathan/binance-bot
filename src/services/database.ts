@@ -23,7 +23,7 @@ export interface Trade {
   expected_profit_percent: number;
   actual_profit_percent?: number;
   actual_profit_usdt?: number;
-  status: 'pending' | 'in_progress' | 'completed' | 'failed' | 'partial';
+  status: 'pending' | 'in_progress' | 'completed' | 'failed' | 'partial' | 'recovering' | 'recovered' | 'stranded';
   error_message?: string;
   created_at: string;
   completed_at?: string;
