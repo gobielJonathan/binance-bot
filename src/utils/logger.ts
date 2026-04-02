@@ -4,7 +4,7 @@ import config from '../config';
 // Serialize Error instances so their message/stack are visible in JSON logs
 const errorReplacer = (_key: string, value: unknown): unknown => {
   if (value instanceof Error) {
-    return {  stack: value.stack, ...value,message: value.message, };
+    return { stack: value.stack, ...value, message: value.message };
   }
   return value;
 };

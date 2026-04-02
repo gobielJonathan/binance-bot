@@ -42,7 +42,7 @@ export class TradeRepository extends BaseRepository {
       WHERE status IN ('pending', 'in_progress', 'recovering') 
       ORDER BY created_at DESC
     `;
-    
+
     return await this.db.all(sql);
   }
 
@@ -57,16 +57,18 @@ export class TradeRepository extends BaseRepository {
   /**
    * Get trade history with filtering and pagination
    */
-  async getTradeHistory(filters: TradeFilter & { page: number; limit: number }): Promise<PaginatedResult<Trade>> {
+  async getTradeHistory(
+    filters: TradeFilter & { page: number; limit: number }
+  ): Promise<PaginatedResult<Trade>> {
     const conditions = [
       { field: 'status', value: filters.status },
       { field: 'triangle_name', value: filters.triangle },
       { field: 'created_at', value: filters.startDate, operator: '>=' },
-      { field: 'created_at', value: filters.endDate, operator: '<=' }
+      { field: 'created_at', value: filters.endDate, operator: '<=' },
     ];
 
     const { where, params } = this.buildWhereClause(conditions);
-    
+
     const baseQuery = `SELECT * FROM trades ${where} ORDER BY created_at DESC`;
     const countQuery = `SELECT COUNT(*) as total FROM trades ${where}`;
 
@@ -89,7 +91,7 @@ export class TradeRepository extends BaseRepository {
       ORDER BY created_at DESC 
       LIMIT ?
     `;
-    
+
     return await this.db.all(sql, [limit]);
   }
 
@@ -98,10 +100,10 @@ export class TradeRepository extends BaseRepository {
    */
   async getTradeStats(): Promise<TradeStats> {
     const trades = await this.getCompletedTrades(1000);
-    
+
     const totalTrades = trades.length;
-    const profitableTrades = trades.filter(t => (t.actual_profit_usdt || 0) > 0);
-    const losingTrades = trades.filter(t => (t.actual_profit_usdt || 0) <= 0);
+    const profitableTrades = trades.filter((t) => (t.actual_profit_usdt || 0) > 0);
+    const losingTrades = trades.filter((t) => (t.actual_profit_usdt || 0) <= 0);
 
     const totalProfit = trades.reduce((sum, t) => sum + (t.actual_profit_usdt || 0), 0);
     const avgProfit = totalTrades > 0 ? totalProfit / totalTrades : 0;
@@ -109,12 +111,14 @@ export class TradeRepository extends BaseRepository {
 
     // Find best and worst trades
     const bestTrade = trades.reduce(
-      (best, t) => (!best || (t.actual_profit_usdt || 0) > (best.actual_profit_usdt || 0) ? t : best),
+      (best, t) =>
+        !best || (t.actual_profit_usdt || 0) > (best.actual_profit_usdt || 0) ? t : best,
       null as Trade | null
     );
 
     const worstTrade = trades.reduce(
-      (worst, t) => (!worst || (t.actual_profit_usdt || 0) < (worst.actual_profit_usdt || 0) ? t : worst),
+      (worst, t) =>
+        !worst || (t.actual_profit_usdt || 0) < (worst.actual_profit_usdt || 0) ? t : worst,
       null as Trade | null
     );
 
@@ -125,18 +129,22 @@ export class TradeRepository extends BaseRepository {
       winRate,
       totalProfit,
       avgProfit,
-      bestTrade: bestTrade ? {
-        id: bestTrade.id!,
-        triangle: bestTrade.triangle_name,
-        profit: bestTrade.actual_profit_usdt!,
-        date: bestTrade.created_at
-      } : undefined,
-      worstTrade: worstTrade ? {
-        id: worstTrade.id!,
-        triangle: worstTrade.triangle_name,
-        profit: worstTrade.actual_profit_usdt!,
-        date: worstTrade.created_at
-      } : undefined
+      bestTrade: bestTrade
+        ? {
+            id: bestTrade.id!,
+            triangle: bestTrade.triangle_name,
+            profit: bestTrade.actual_profit_usdt!,
+            date: bestTrade.created_at,
+          }
+        : undefined,
+      worstTrade: worstTrade
+        ? {
+            id: worstTrade.id!,
+            triangle: worstTrade.triangle_name,
+            profit: worstTrade.actual_profit_usdt!,
+            date: worstTrade.created_at,
+          }
+        : undefined,
     };
   }
 
@@ -172,7 +180,7 @@ export class TradeRepository extends BaseRepository {
       trade.leg3_filled,
       trade.expected_profit_percent,
       trade.status,
-      trade.created_at
+      trade.created_at,
     ]);
 
     return result.lastID!;
@@ -183,7 +191,7 @@ export class TradeRepository extends BaseRepository {
    */
   async updateTrade(id: number, updates: Partial<Trade>): Promise<void> {
     const fields = Object.keys(updates)
-      .map(key => `${key} = ?`)
+      .map((key) => `${key} = ?`)
       .join(', ');
     const values = Object.values(updates);
 

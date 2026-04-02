@@ -132,7 +132,8 @@ class BinanceService {
     if (!lotFilter) throw new Error(`LOT_SIZE filter not found for ${symbol}`);
 
     const stepSize = parseFloat(lotFilter.stepSize);
-    const stepDecimals = (lotFilter.stepSize as string).replace(/0+$/, '').split('.')[1]?.length ?? 0;
+    const stepDecimals =
+      (lotFilter.stepSize as string).replace(/0+$/, '').split('.')[1]?.length ?? 0;
 
     const filter: LotSizeFilter = {
       minQty: parseFloat(lotFilter.minQty),

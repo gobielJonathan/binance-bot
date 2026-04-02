@@ -23,7 +23,15 @@ export interface Trade {
   expected_profit_percent: number;
   actual_profit_percent?: number;
   actual_profit_usdt?: number;
-  status: 'pending' | 'in_progress' | 'completed' | 'failed' | 'partial' | 'recovering' | 'recovered' | 'stranded';
+  status:
+    | 'pending'
+    | 'in_progress'
+    | 'completed'
+    | 'failed'
+    | 'partial'
+    | 'recovering'
+    | 'recovered'
+    | 'stranded';
   error_message?: string;
   created_at: string;
   completed_at?: string;
@@ -199,14 +207,10 @@ class Database {
 
   async getRecentTrades(limit: number = 50): Promise<Trade[]> {
     return new Promise((resolve, reject) => {
-      this.db.all(
-        `SELECT * FROM trades ORDER BY created_at DESC LIMIT ?`,
-        [limit],
-        (err, rows) => {
-          if (err) reject(err);
-          else resolve(rows as Trade[]);
-        }
-      );
+      this.db.all(`SELECT * FROM trades ORDER BY created_at DESC LIMIT ?`, [limit], (err, rows) => {
+        if (err) reject(err);
+        else resolve(rows as Trade[]);
+      });
     });
   }
 

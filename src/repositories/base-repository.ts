@@ -31,7 +31,7 @@ export abstract class BaseRepository {
     return {
       async run(sql: string, params: any[] = []): Promise<sqlite3.RunResult> {
         return new Promise((resolve, reject) => {
-          database.run(sql, params, function(err: Error | null) {
+          database.run(sql, params, function (err: Error | null) {
             if (err) {
               logger.error('SQL run error', { sql, params, error: err });
               reject(err);
@@ -66,7 +66,7 @@ export abstract class BaseRepository {
             }
           });
         });
-      }
+      },
     };
   }
 
@@ -78,24 +78,27 @@ export abstract class BaseRepository {
     limit: number
   ): Promise<PaginatedResult<T>> {
     const offset = (page - 1) * limit;
-    
+
     // Get total count
     const countResult = await this.db.get(countQuery, params);
     const total = countResult?.total || 0;
-    
+
     // Get paginated data
     const data = await this.db.all(`${baseQuery} LIMIT ? OFFSET ?`, [...params, limit, offset]);
-    
+
     return {
       data,
       total,
       page,
       limit,
-      totalPages: Math.ceil(total / limit)
+      totalPages: Math.ceil(total / limit),
     };
   }
 
-  protected buildWhereClause(conditions: Array<{ field: string; value: any; operator?: string }>): { where: string; params: any[] } {
+  protected buildWhereClause(conditions: Array<{ field: string; value: any; operator?: string }>): {
+    where: string;
+    params: any[];
+  } {
     if (conditions.length === 0) {
       return { where: '', params: [] };
     }
@@ -112,7 +115,7 @@ export abstract class BaseRepository {
 
     return {
       where: whereClauses.length > 0 ? `WHERE ${whereClauses.join(' AND ')}` : '',
-      params
+      params,
     };
   }
 }

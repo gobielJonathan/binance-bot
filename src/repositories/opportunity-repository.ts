@@ -25,7 +25,7 @@ export class OpportunityRepository extends BaseRepository {
       ORDER BY created_at DESC 
       LIMIT ?
     `;
-    
+
     return await this.db.all(sql, [limit]);
   }
 
@@ -39,11 +39,11 @@ export class OpportunityRepository extends BaseRepository {
       { field: 'spread_percent', value: filter.minSpread, operator: '>=' },
       { field: 'spread_percent', value: filter.maxSpread, operator: '<=' },
       { field: 'created_at', value: filter.startDate, operator: '>=' },
-      { field: 'created_at', value: filter.endDate, operator: '<=' }
+      { field: 'created_at', value: filter.endDate, operator: '<=' },
     ];
 
     // Only include non-null conditions
-    const activeConditions = conditions.filter(c => c.value !== undefined);
+    const activeConditions = conditions.filter((c) => c.value !== undefined);
     const { where, params } = this.buildWhereClause(activeConditions);
 
     const sql = `
@@ -64,7 +64,7 @@ export class OpportunityRepository extends BaseRepository {
       WHERE executed = 1 
       ORDER BY created_at DESC
     `;
-    
+
     return await this.db.all(sql);
   }
 
@@ -77,7 +77,7 @@ export class OpportunityRepository extends BaseRepository {
       WHERE executed = 0 
       ORDER BY created_at DESC
     `;
-    
+
     return await this.db.all(sql);
   }
 
@@ -102,7 +102,7 @@ export class OpportunityRepository extends BaseRepository {
       opportunity.leg3_pair,
       opportunity.leg3_price,
       opportunity.executed ? 1 : 0,
-      opportunity.created_at
+      opportunity.created_at,
     ]);
 
     return result.lastID!;
@@ -128,7 +128,7 @@ export class OpportunityRepository extends BaseRepository {
     maxSpread: number;
   }> {
     const fromDate = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
-    
+
     const sql = `
       SELECT 
         COUNT(*) as total,
@@ -141,14 +141,14 @@ export class OpportunityRepository extends BaseRepository {
     `;
 
     const stats = await this.db.get(sql, [fromDate]);
-    
+
     return {
       total: stats.total || 0,
       executed: stats.executed || 0,
       missed: stats.missed || 0,
       executionRate: stats.total > 0 ? (stats.executed / stats.total) * 100 : 0,
       avgSpread: stats.avgSpread || 0,
-      maxSpread: stats.maxSpread || 0
+      maxSpread: stats.maxSpread || 0,
     };
   }
 }

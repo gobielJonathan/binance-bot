@@ -39,11 +39,7 @@ export class MetricsRepository extends BaseRepository {
       VALUES (?, ?, ?)
     `;
 
-    const result = await this.db.run(sql, [
-      metric.metric_type,
-      metric.value,
-      metric.timestamp
-    ]);
+    const result = await this.db.run(sql, [metric.metric_type, metric.value, metric.timestamp]);
 
     return result.lastID!;
   }
@@ -69,7 +65,7 @@ export class MetricsRepository extends BaseRepository {
    * Get performance data by period using completed trades
    */
   async getPerformanceByPeriod(
-    period: 'daily' | 'weekly' | 'monthly', 
+    period: 'daily' | 'weekly' | 'monthly',
     count: number
   ): Promise<PerformanceResult> {
     // Get completed trades
@@ -80,7 +76,7 @@ export class MetricsRepository extends BaseRepository {
     `;
 
     const trades: Trade[] = await this.db.all(sql);
-    
+
     // Group trades by period
     const grouped: { [key: string]: { profit: number; count: number; trades: Trade[] } } = {};
 
@@ -153,8 +149,8 @@ export class MetricsRepository extends BaseRepository {
         totalProfit: cumulative,
         totalTrades: trades.length,
         avgProfitPerPeriod:
-          limitedData.length > 0 
-            ? limitedData.reduce((sum, d) => sum + d.profit, 0) / limitedData.length 
+          limitedData.length > 0
+            ? limitedData.reduce((sum, d) => sum + d.profit, 0) / limitedData.length
             : 0,
       },
     };
@@ -163,7 +159,10 @@ export class MetricsRepository extends BaseRepository {
   /**
    * Get aggregated metrics for a specific period
    */
-  async getAggregatedMetrics(period: string, fromDate: Date): Promise<{
+  async getAggregatedMetrics(
+    period: string,
+    fromDate: Date
+  ): Promise<{
     period: string;
     totalTrades: number;
     totalProfit: number;
@@ -179,12 +178,13 @@ export class MetricsRepository extends BaseRepository {
     `;
 
     const trades: Trade[] = await this.db.all(sql, [fromDate.toISOString()]);
-    
+
     const totalProfit = trades.reduce((sum, t) => sum + (t.actual_profit_usdt || 0), 0);
     const avgProfit = trades.length > 0 ? totalProfit / trades.length : 0;
-    const winRate = trades.length > 0 
-      ? (trades.filter(t => (t.actual_profit_usdt || 0) > 0).length / trades.length) * 100 
-      : 0;
+    const winRate =
+      trades.length > 0
+        ? (trades.filter((t) => (t.actual_profit_usdt || 0) > 0).length / trades.length) * 100
+        : 0;
 
     // Group by date for chart data
     const data = this.groupTradesByDate(trades, period);
@@ -195,7 +195,7 @@ export class MetricsRepository extends BaseRepository {
       totalProfit,
       avgProfit,
       winRate,
-      data
+      data,
     };
   }
 
@@ -240,7 +240,7 @@ export class MetricsRepository extends BaseRepository {
         profit: stats.profit,
         count: stats.count,
         avgProfit: stats.count > 0 ? stats.profit / stats.count : 0,
-        cumulativeProfit: 0
+        cumulativeProfit: 0,
       }))
       .sort((a, b) => a.date.localeCompare(b.date));
 
