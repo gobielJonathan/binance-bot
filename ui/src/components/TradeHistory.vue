@@ -29,7 +29,7 @@
     </div>
 
     <!-- Content -->
-    <div v-if="tradingStore.loading.tradeHistory && trades.length === 0" class="flex items-center justify-center py-16">
+    <div v-if="tradingStore.loading.tradeHistory && tradingStore.tradeHistory.length === 0" class="flex items-center justify-center py-16">
       <div class="flex flex-col items-center gap-3">
         <div class="w-7 h-7 border-2 border-slate-700 border-t-cyan-500 rounded-full animate-spin"></div>
         <p class="text-xs text-slate-500">Loading trades...</p>
@@ -42,7 +42,7 @@
       <p class="text-xs text-slate-600 mt-1">{{ tradingStore.errors.tradeHistory }}</p>
     </div>
 
-    <div v-else-if="tradingStore.loading.tradeHistory && trades.length === 0" class="py-16 text-center">
+    <div v-else-if="tradingStore.loading.tradeHistory && tradingStore.tradeHistory.length === 0" class="py-16 text-center">
       <ChartBarIcon class="w-10 h-10 text-slate-800 mx-auto mb-3" />
       <p class="text-sm text-slate-500 font-medium">No trades found</p>
       <p class="text-xs text-slate-600 mt-1">Executed trades will appear here</p>

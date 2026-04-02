@@ -1,11 +1,11 @@
 <template>
   <div class="max-h-96 overflow-y-auto">
-    <div v-if="tradingStore.loading.trades" class="flex items-center justify-center py-12">
+    <div v-if="tradingStore.loading.openTrades" class="flex items-center justify-center py-12">
       <div class="w-7 h-7 border-2 border-slate-700 border-t-cyan-500 rounded-full animate-spin"></div>
     </div>
-    <div v-else-if="tradingStore.errors.trades" class="py-8 text-center">
+    <div v-else-if="tradingStore.errors.openTrades" class="py-8 text-center">
       <ExclamationTriangleIcon class="w-6 h-6 text-red-400 mx-auto mb-2" />
-      <p class="text-sm text-red-400">{{ tradingStore.errors.trades }}</p>
+      <p class="text-sm text-red-400">{{ tradingStore.errors.openTrades }}</p>
     </div>
     <div v-else-if="tradingStore.openTrades.length === 0" class="py-12 text-center">
       <ArrowPathIcon class="w-8 h-8 text-slate-700 mx-auto mb-3" />
