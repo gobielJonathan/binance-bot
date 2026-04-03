@@ -7,6 +7,7 @@ let socket: Socket | null = null
 export function getSocket(): Socket {
   if (!socket) {
     socket = io(SOCKET_URL, {
+      path: import.meta.env.PROD ? '/api/socket.io' : '/socket.io',
       autoConnect: false,
       reconnection: true,
       reconnectionDelay: 2000,

@@ -33,6 +33,7 @@ class DashboardServer {
     this.server = createServer(this.app);
     this.io = new Server(this.server, {
       cors: { origin: '*', methods: ['GET', 'POST'] },
+      path: '/api/socket.io',
     });
 
     this.setupMiddleware();
