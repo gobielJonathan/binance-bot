@@ -50,10 +50,10 @@ class BinanceService {
     this.client = Binance({
       apiKey: config.exchange.apiKey,
       apiSecret: config.exchange.apiSecret,
-      httpBase: this.isTestnet ? 'https://testnet.binance.vision' : 'https://api.binance.com',
+      httpBase: this.isTestnet ? 'https://demo-api.binance.com' : 'https://api.binance.com',
 
       wsBase: this.isTestnet
-        ? 'wss://stream.testnet.binance.vision/ws'
+        ? 'wss://demo-stream.binance.com/ws'
         : 'wss://stream.binance.com:9443/ws',
     });
 
