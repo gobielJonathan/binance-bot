@@ -13,7 +13,7 @@
     "lint:oxlint": "oxlint . --fix",
     "lint:eslint": "eslint . --fix --cache",
     "format": "oxfmt src/",
-    "prod": "pnpm run build && sudo cp -r dist/* /var/www/app/"
+    "prod": "pnpm run build && sudo cp -r dist/* /var/www/html/"
   },
   "dependencies": {
     "@headlessui/vue": "^1.7.23",
