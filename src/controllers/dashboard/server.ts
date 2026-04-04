@@ -14,6 +14,7 @@ import tradesRouter from './routes/trades';
 import performanceRouter from './routes/performance';
 import balanceRouter from './routes/balance';
 import opportunitiesRouter from './routes/opportunities';
+import detectPort from 'detect-port';
 
 class DashboardServer {
   private app: express.Application;
@@ -93,7 +94,9 @@ class DashboardServer {
     this.io.emit('ticker:update', priceData);
   }
 
-  public start(): void {
+  public async start(): Promise<void> {
+    const realPort = await detectPort(this.port);
+    this.port = realPort
     this.server.listen(this.port, () => {
       logger.info('Dashboard server started', {
         port: this.port,
@@ -102,10 +105,14 @@ class DashboardServer {
     });
   }
 
-  public stop(): void {
-    this.io.close();
-    this.server.close();
-    logger.info('Dashboard server stopped');
+  public stop(): Promise<void> {
+    return new Promise((resolve) => {
+      this.io.close();
+      this.server.close(() => {
+        logger.info('Dashboard server stopped');
+        resolve();
+      });
+    });
   }
 }
 

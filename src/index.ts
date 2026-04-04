@@ -144,7 +144,7 @@ class TradingBot {
         await this.handleOpportunity(opportunity);
       });
 
-      this.dashboardServer.start();
+      await this.dashboardServer.start();
 
       this.isRunning = true;
       logger.info('✅ Trading bot started successfully');
@@ -288,7 +288,7 @@ class TradingBot {
     logger.info('Stopping trading bot...');
 
     this.wsClient.unsubscribeAll();
-    this.dashboardServer.stop();
+    await this.dashboardServer.stop();
     await this.database.close();
 
     this.isRunning = false;
