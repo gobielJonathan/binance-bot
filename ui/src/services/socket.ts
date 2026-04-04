@@ -1,6 +1,6 @@
 import { io, Socket } from 'socket.io-client'
 
-const SOCKET_URL = import.meta.env.PROD ? 'http://27.111.32.158' : 'http://localhost:3000'
+const SOCKET_URL = import.meta.env.PROD ? 'https://bot.gobiel.online' : 'http://localhost:3000'
 
 let socket: Socket | null = null
 
