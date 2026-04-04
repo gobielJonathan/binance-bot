@@ -7,7 +7,7 @@ import type {
   Opportunity 
 } from '../types/api'
 
-const API_BASE = import.meta.env.PROD? 'http://27.111.32.158/api': 'http://localhost:3000/api'
+const API_BASE = import.meta.env.PROD? 'https://bot.gobiel.online/api': 'http://localhost:3000/api'
 
 const api = axios.create({
   baseURL: API_BASE,
