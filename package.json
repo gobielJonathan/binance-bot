@@ -7,7 +7,7 @@
     "build": "tsc",
     "dev": "nodemon --exec ts-node src/index.ts",
     "start": "node dist/index.js",
-    "prod": "npm run build && pm2 start dist/index.js --name binance-bot",
+    "prod": "npm run build && pm2 start dist/index.js --name binance-bot -f",
     "prod:stop": "pm2 stop binance-bot",
     "prod:restart": "pm2 restart binance-bot",
     "prod:logs": "pm2 logs binance-bot",
